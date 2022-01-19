@@ -1,0 +1,56 @@
+親クラス GTTMRuleSet
+
+def apply_rules():
+    前処理
+  for key,rule in rule_set():
+    result = ルール呼び出し
+    result = rule_hook(key,rule,result)
+    resultをどこかに格納
+  apply_recursive_process(引数)
+
+def rule_set():
+  抽象メソッド
+
+def rule_hook(key, rule, result):
+  抽象メソッド
+
+def apply_recursive_process(引数):
+  抽象メソッド
+
+
+def write_file():
+  for i in range(len(nodes)):
+  for key,value in nodes[i].rule[rule_name()]:
+    ファイルに書き込む
+
+def rule_name():
+  抽象メソッド
+
+def top_tag():
+  抽象メソッド
+
+GPRクラス
+
+def rule_set():
+  return {"2a": rules.GPR2a, "2b": rules.GPR2b, ...}
+
+
+def rule_hook(key, rule, result):
+  if key == "1":
+     return 特別な処理を行う
+ 　else:
+     return result
+
+def apply_recursive_process(引数):
+  再帰的な処理が必要な場合はここに書く
+
+def rule_name():
+  return "GPR"
+
+def top_tag():
+  return "group"
+
+def tag_names():
+  return ["group"]
+
+
