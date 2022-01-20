@@ -2,9 +2,10 @@ from Score import Score
 from GPR import GPR
 from MPR import MPR
 from TS import TS
+import sys
 
 def main():
-    filename = "/Users/yamakawatakashi/Documents/ゼミ/GPR_test/GPR6_01.musicxml"
+    filename = sys.argv[1]
 
     score = Score(filename)
 

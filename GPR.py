@@ -299,13 +299,6 @@ class Rules:
         self.T_low = param["T_low"]
         self.adjust_sigma = param["adjust_sigma"]
 
-    def min_max(self,x):
-        ary = np.array(x)
-        min = ary.min()
-        max = ary.max()
-        result = (ary-min)/(max-min)
-        return result
-
 class GPR(GTTMRuleSet):
     param = {"Wm":0.5,"Wl":0.5,"Ws":0.5,"S2a":0.5,"S2b":0.5,"S3a":0.5,"S3b":0.5,"S3c":0.5,"S3d":0.5,
             "S4":0.5,"S5":0.5,"S6":0.5,"T4":0.5,"T_low":0.5,"adjust_sigma":0.05,"div":1.0}
@@ -369,7 +362,7 @@ class GPR(GTTMRuleSet):
                 else:
                     nodes[i].rule.GPR[key] = rule_func(i)
 
-        gpr6[1:-1] = rules.min_max(gpr6[1:-1])
+        gpr6[1:-1] = self.min_max(gpr6[1:-1])
         for i in range(1,len(nodes)-1):
             nodes[i].rule.GPR["6"] = gpr6[i]
             for k in apply_rule.keys():
@@ -401,7 +394,7 @@ class GPR(GTTMRuleSet):
         B_high = np.array([0.0] * len(nodes))
         for i in range(end-start):
             gpr5[i] = self.rules.GPR5(i+start,start,end)
-        gpr5 = self.rules.min_max(gpr5)
+        gpr5 = self.min_max(gpr5)
 
         B_high_list = ["2a","2b","3c","3b","3c","3d","4","5","6"]
         for i in bond_number:
@@ -410,7 +403,7 @@ class GPR(GTTMRuleSet):
             for k in B_high_list:
                 B_high[i] += nodes[i].rule.GPR[k]*self.param["S"+k]
 
-        B_high[bond_number] = self.rules.min_max(B_high[bond_number])
+        B_high[bond_number] = self.min_max(B_high[bond_number])
         for i in bond_number:
             nodes[i].rule.high_boundary = nodes[i].rule.low_boundary * B_high[i]
 
@@ -450,9 +443,9 @@ class GPR(GTTMRuleSet):
                 divide_num = i
             
         if divide_flag == 1:
-            self.write_xml(group,nodes[:divide_num+1],n+1)
-            self.write_rule(nodes[divide_num],group)
-            self.write_xml(group,nodes[divide_num:],n+1)
+            self.__write_gpr(group,nodes[:divide_num+1],n+1)
+            self.__write_rule(nodes[divide_num],group)
+            self.__write_gpr(group,nodes[divide_num:],n+1)
         else:
             for i in range(len(nodes)-1):
                 if nodes[i] != None:
@@ -468,6 +461,13 @@ class GPR(GTTMRuleSet):
             if node.rule.GPR[k] == 1:
                 applied = et.SubElement(group,'applied')
                 applied.set('rule',k)
+
+    def min_max(self,x):
+        ary = np.array(x)
+        min = ary.min()
+        max = ary.max()
+        result = (ary-min)/(max-min)
+        return result
         
 
     

@@ -210,11 +210,11 @@ class MPR(GTTMRuleSet):
         slur = []
         num = []
         for i in range(len(nodes)):
-            velo.append(self.nodes[i].velo)
-            valu.append(self.nodes[i].valu)
-            vol.append(self.nodes[i].vol)
-            slur.append(self.nodes[i].slur)
-            num.append(self.nodes[i].num)
+            velo.append(nodes[i].velo)
+            valu.append(nodes[i].valu)
+            vol.append(nodes[i].vol)
+            slur.append(nodes[i].slur)
+            num.append(nodes[i].num)
 
         self.rules = Rules(nodes,velo,valu,vol,slur,num)
         rules = self.rules
