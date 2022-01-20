@@ -345,7 +345,7 @@ class TS(GTTMRuleSet):
 
         if node.primary != None:
             primary = et.SubElement(ts,'primary')
-            self.__write_xml(primary,node.primary)
+            self.__write_ts(primary,node.primary)
         if node.secondary != None:
             secondary = et.SubElement(ts, 'secondary')
-            self.__write_xml(secondary,node.secondary)
+            self.__write_ts(secondary,node.secondary)
