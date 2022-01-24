@@ -241,7 +241,7 @@ class MPR(GTTMRuleSet):
             sum = 0
             for k in range(len(nodes)):
                 if rules.MPR1(i,k) == 1:
-                    sum += self.B_low[k] * self.param["S1"]
+                    sum += B_low[k] * self.param["S1"]
                 
             D_low[i] += B_low[i] + sum
 
