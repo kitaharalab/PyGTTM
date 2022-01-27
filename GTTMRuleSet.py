@@ -6,18 +6,18 @@ class GTTMRuleSet(metaclass=ABCMeta):
         self.score = score
 
     def apply_rules(self):
-        nodes = self.get_node()
-        self.__apply_rules(self.nodes)
+        nodes = self.get_nodes()
+        self.__apply_rules(nodes)
 
     def __apply_rules(self,nodes):
         if len(nodes) <= 1:
             return 
-
-        rules = self.create_rule(nodes)
+        
         param = self.get_param()
+        rules = self.create_rule(nodes,param)
 
         apply_rule_list = self.rule_set(rules)
-        for key,rule_func in apply_rule_list.item():
+        for key,rule_func in apply_rule_list.items():
             for i in range(len(nodes)):
                 nodes[i].rule[key] = rule_func(i)
         
@@ -26,37 +26,38 @@ class GTTMRuleSet(metaclass=ABCMeta):
         for i in range(len(nodes)):
             for key in apply_rule_list.keys():
                 D_sum[i] += nodes[i].rule[key] * param["S"+key] 
-        D_sum[i] += self.apply_recursive_process()
+        D_sum = self.apply_recursive_process(D_sum)
 
-        next_node = self.calc_analysis(D_sum)
-        self.__apply_rules(next_node)
-                
+        next_node = self.calc_analysis(nodes,D_sum)
+        self.recursion_process(next_node)
     
+    def recursion_process(self, nodes):
+        self.__apply_rules(nodes)
+
     @abstractmethod
     def get_param(self):
         pass
 
     @abstractmethod
-    def create_rule(self,nodes):
+    def create_rule(self,nodes,param):
         pass
 
-    @abstractmethod
     def get_nodes(self):
-        pass
+        return self.nodes
 
     @abstractmethod
-    def calc_analysis(self):
+    def calc_analysis(self,nodes,D_sum):
         pass     
 
     @abstractmethod
-    def rule_set(self):
+    def rule_set(self,rules):
         pass
 
-    def apply_recursive_process(self):
-        return 0
+    def apply_recursive_process(self,D_sum):
+        return D_sum
 
     def get_result(self):
-        return self.root
+        return self.get_nodes()
 
     @abstractmethod
     def write_file(self, filename):

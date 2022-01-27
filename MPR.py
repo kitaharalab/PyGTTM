@@ -13,15 +13,10 @@ class MPR_node:
         self.slur = slur #スラーの長さ
         self.num = num #音高
         self.boundary = 0 #start:1
-        self.rule = MPR_rule()
-        self.rule.id = id
-
-class MPR_rule:
-
-    def __init__(self):
+        self.id = id
         self.dot = 1
-        self.MPR = {"1":0, "2":0, "3":0, "4":0, "5a":0, "5b":0, "5c":0, "5d":0, "5e":0}
-        self.id = ""
+        self.rule = {"1":0, "2":0, "3":0, "4":0, "5a":0, "5b":0, "5c":0, "5d":0, "5e":0}
+
 
 class Rules:
     def __init__(self,nodes,velo,valu,vol,slur,num):
@@ -128,7 +123,7 @@ class Rules:
 
     #相対的に長い アーティキュレーションパターンの繰り返し が強拍となる拍節構造を優先する.
     def MPR5d(self, i):
-        if i < len(self.nodes)-1 and self.nodes[i].rule.MPR["5a"] == 1 and self.nodes[i+1].rule.MPR["5a"] == 1:
+        if i < len(self.nodes)-1 and self.nodes[i].rule["5a"] == 1 and self.nodes[i+1].rule["5a"] == 1:
             return 1
         else :
             return 0
@@ -182,7 +177,7 @@ class MPR(GTTMRuleSet):
                 id = self.score.get_id(k)
                 node = MPR_node(L_end, velo, valu, vol, slur, num, id)
                 
-                if GPR[k].rule.boundary != 0:
+                if GPR[k].boundary != 0:
                     node.boundary = 1
                 M_nodes.append(node)
                 k += 1
@@ -200,10 +195,11 @@ class MPR(GTTMRuleSet):
         M_nodes[0].boundary = 1
         return M_nodes
 
-    def apply_rules(self):
-        self.__calc_MPR(self.nodes)
-    
-    def __calc_MPR(self,nodes):
+
+    def get_param(self):
+        return self.param
+
+    def create_rule(self,nodes,param):
         velo = []
         valu = []
         vol = []
@@ -217,47 +213,37 @@ class MPR(GTTMRuleSet):
             num.append(nodes[i].num)
 
         self.rules = Rules(nodes,velo,valu,vol,slur,num)
-        rules = self.rules
-        rules.set_param(self.param)
-        B_low = np.array([0.0] * len(nodes))
+        self.rules.set_param(self.param)
+        return self.rules
 
-        apply_rule = {"2":rules.MPR2,"3":rules.MPR3,"4":rules.MPR4,"5a":rules.MPR5a,"5b":rules.MPR5b,"5c":rules.MPR5c,"5e":rules.MPR5e}
+    def rule_set(self,rules):
+        apply_rule = {"2":rules.MPR2,"3":rules.MPR3,"4":rules.MPR4,"5a":rules.MPR5a,"5b":rules.MPR5b,"5c":rules.MPR5c,"5e":rules.MPR5e,"5d":rules.MPR5d}
+        return apply_rule
 
-        for i in range(len(nodes)):
-            for key,rule_func in apply_rule.items():
-                nodes[i].rule.MPR[key] = rule_func(i)
-        
-        B_low_list = ["2","3","4","5a","5b","5c","5d","5e"]
-
-
-        for i in range(len(nodes)):
-            nodes[i].rule.MPR["5d"] = rules.MPR5d(i)
-            for k in B_low_list:
-                B_low[i] += nodes[i].rule.MPR[k]*self.param["S"+k]
-            
-        D_low = np.array([0.0] * len(nodes))
-
-        for i in range(len(nodes)):
+    def apply_recursive_process(self,D_sum):
+        D_low = np.array([0.0] * len(D_sum))
+        for i in range(len(D_sum)):
             sum = 0
-            for k in range(len(nodes)):
-                if rules.MPR1(i,k) == 1:
-                    sum += B_low[k] * self.param["S1"]
-                
-            D_low[i] += B_low[i] + sum
+            for k in range(len(D_sum)):
+                if self.rules.MPR1(i,k) == 1:
+                    sum += D_sum[k] * self.param["S1"]
+            D_low[i] += D_sum[i] + sum
+        return D_low
 
+    def calc_analysis(self,nodes,D_sum):
         next_m = [0,0,0,0,0]
         for i in range(len(nodes)):
             for m in range(5):
                 if (m==0 or m==1) and np.mod(i-m,2) == 0:
-                    next_m[m] += D_low[i]
+                    next_m[m] += D_sum[i]
                 if (m==2 or m==3 or m==4) and np.mod(i-m,3) == 2:
-                    next_m[m] += D_low[i] * self.param["S10"]
+                    next_m[m] += D_sum[i] * self.param["S10"]
 
         m = np.argmax(next_m)
         next_nodes = []
         for i in range(len(nodes)):
             if (m == 0 or m == 1) and np.mod(i-m,2) == 0:
-                nodes[i].rule.dot += 1
+                nodes[i].dot += 1
                 if i >= 1 and nodes[i-1].boundary == 1:
                     nodes[i].boundary = 1
                 if len(next_nodes) > 0 and next_nodes[-1].boundary == 1:
@@ -265,15 +251,15 @@ class MPR(GTTMRuleSet):
                 next_nodes.append(nodes[i])
 
             if (m == 2 or m == 3 or m == 4) and np.mod(i-m,3) == 0:
-                nodes[i].rule.dot += 1
+                nodes[i].dot += 1
                 if (i >= 1 and nodes[i-1].boundary == 1) or (i >= 2 and nodes[i-2].boundary == 1):
                     nodes[i].boundary = 1
                 if len(next_nodes) > 0 and next_nodes[-1].boundary == 1:
                     nodes[i].boundary = 0
                 next_nodes.append(nodes[i])
 
-        if len(next_nodes) > 1:
-            self.__calc_MPR(next_nodes)
+        return next_nodes
+
 
     def get_result(self):
         return self.nodes

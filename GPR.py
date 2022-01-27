@@ -14,16 +14,12 @@ class GPR_node:
         self.dyn = dyn #ダイナミクスの差
         self.arti = arti #楽譜上の音符の長さと実際に演奏された音の長さの比
         self.leng = leng #音価の差
-        self.rule = GPR_rule() #適応ルール
-        self.rule.id = id
-
-class GPR_rule:
-    def __init__(self):
         self.boundary = 0
         self.low_boundary = 0
         self.high_boundary = 0
-        self.GPR = {"1":0, "2a":0, "2b":0, "3a":0, "3b":0, "3c":0, "3d":0, "4":0, "5":0, "6":0}
+        self.rule = {"1":0, "2a":0, "2b":0, "3a":0, "3b":0, "3c":0, "3d":0, "4":0, "5":0, "6":0}
         self.id = ""
+
 
 class Rules:
     def __init__(self,rest,ioi,regi,dyn,arti,leng):
@@ -40,7 +36,7 @@ class Rules:
     
     #単音をグループとしない
     def GPR1(self,i):
-        if self.B_low[i-1] <= self.B_low[i] and self.B_low[i+1] <= self.B_low[i] and self.nodes[i-1].rule.GPR["1"] == 0 and self.nodes[i+1].rule.GPR["1"] == 0:
+        if self.B_low[i-1] <= self.B_low[i] and self.B_low[i+1] <= self.B_low[i] and self.nodes[i-1].rule["1"] == 0 and self.nodes[i+1].rule["1"] == 0:
             return 1
         else:
             return 0
@@ -312,8 +308,8 @@ class GPR(GTTMRuleSet):
     def __set_GPR(self):
         nodes = []
         nodes.append(GPR_node(-1,0,0,0,0,0,0,self.score.get_id(0)))
-        nodes[0].rule.low_boundary = 1
-        nodes[0].rule.GPR["1"] = 1
+        nodes[0].low_boundary = 1
+        nodes[0].rule["1"] = 1
         for i in range(self.score.get_score_length()-1):
             L_end = self.score.get_L_end(i)
             rest = self.score.get_rest(i)
@@ -325,15 +321,61 @@ class GPR(GTTMRuleSet):
             id = self.score.get_id(i+1)
             nodes.append(GPR_node(L_end, rest, ioi, regi, dyn, arti, leng, id))
         nodes.append(GPR_node(-1,0,0,0,0,0,0,""))
-        nodes[-1].rule.low_boundary = 1
-        nodes[-1].rule.GPR["1"] = 1
+        nodes[-1].low_boundary = 1
+        nodes[-1].rule["1"] = 1
 
         return nodes
 
-    def apply_rules(self):
-        self.__calcGPR(self.nodes)
+    def __set_boundary(self,nodes,level,start,end):
+        if start+1 >= end-1 :
+            return 
 
-    def __calcGPR(self,nodes):
+        gpr5 = np.array([0.0] * (end-start))
+        bond_number = []
+        for i in range(start+1,end-1):
+            if nodes[i].low_boundary == 1 and nodes[i].boundary == 0:
+                bond_number.append(i)
+
+        if len(bond_number) == 0:
+            return
+        
+        B_high = np.array([0.0] * len(nodes))
+        for i in range(end-start):
+            gpr5[i] = self.rules.GPR5(i+start,start,end)
+        gpr5 = self.min_max(gpr5)
+
+        B_high_list = ["2a","2b","3c","3b","3c","3d","4","5","6"]
+        for i in bond_number:
+            nodes[i].rule["4"] = self.rules.GPR4(i,start,end)
+            nodes[i].rule["5"] = gpr5[i-start]
+            for k in B_high_list:
+                B_high[i] += nodes[i].rule[k]*self.param["S"+k]
+
+        B_high[bond_number] = self.min_max(B_high[bond_number])
+        for i in bond_number:
+            nodes[i].high_boundary = nodes[i].low_boundary * B_high[i]
+
+        high_boundary = bond_number[0]
+        for num in bond_number:
+            if nodes[num].high_boundary > nodes[high_boundary].high_boundary:
+                high_boundary = num
+
+        nodes[high_boundary].boundary = level
+
+        self.__set_boundary(nodes,level+1,start,high_boundary+1)
+        self.__set_boundary(nodes,level+1,high_boundary,end)
+
+
+    def apply_recursive_process(self,D_sum):
+        D_sum[1:-1] = self.min_max(D_sum[1:-1])
+        D_sum[0] = 1.0
+        D_sum[-1] = 1.0
+        return D_sum
+
+    def get_param(self):
+        return self.param
+    
+    def create_rule(self, nodes,param):
         rest = []
         ioi = []
         regi = []
@@ -349,73 +391,31 @@ class GPR(GTTMRuleSet):
             leng.append(nodes[i].leng)
         
         self.rules = Rules(rest,ioi,regi,dyn,arti,leng)
-        self.rules.set_param(self.param)
-        rules = self.rules
-        B_low = np.array([0.0] * len(nodes))
-        gpr6 = np.array([0.0] * len(nodes))
+        self.rules.set_param(param)
+        return self.rules
 
-        apply_rule = {"2a":rules.GPR2a, "2b":rules.GPR2b, "3a":rules.GPR3a, "3b":rules.GPR3b, "3c":rules.GPR3c, "3d":rules.GPR3d, "6":rules.GPR6}
+    def calc_analysis(self,nodes,D_sum):
+        self.rules.set_nodes(nodes,D_sum)
         for i in range(1,len(nodes)-1):
-            for key,rule_func in apply_rule.items():
-                if key == "6":
-                    gpr6[i] = rule_func(i)
-                else:
-                    nodes[i].rule.GPR[key] = rule_func(i)
+            nodes[i].rule["1"] = self.rules.GPR1(i)
+            nodes[i].low_boundary = 1 if nodes[i].rule["1"] == 1 and D_sum[i] > self.param["T_low"] else 0
 
-        gpr6[1:-1] = self.min_max(gpr6[1:-1])
-        for i in range(1,len(nodes)-1):
-            nodes[i].rule.GPR["6"] = gpr6[i]
-            for k in apply_rule.keys():
-                B_low[i] += nodes[i].rule.GPR[k]*self.param["S"+k]
-        B_low[0] = 1.0
-        B_low[-1] = 1.0
+        return nodes
 
-        rules.set_nodes(nodes,B_low)
-        for i in range(1,len(nodes)-1):
-            nodes[i].rule.GPR["1"] = rules.GPR1(i)
-            nodes[i].rule.low_boundary = 1 if nodes[i].rule.GPR["1"] == 1 and B_low[i] > self.param["T_low"] else 0
-        
+    def rule_set(self,rules):
+        apply_rule = {"2a":rules.GPR2a, "2b":rules.GPR2b, "3a":rules.GPR3a, "3b":rules.GPR3b, "3c":rules.GPR3c, "3d":rules.GPR3d, "6":self.GPR6}
+        return apply_rule
 
-        self.__set_boundary(nodes, 1, 0, len(nodes))
+    def GPR6(self,i):
+        if i == 0:
+            self.gpr6 = np.array([0.0] * len(self.nodes))
+            for j in range(1,len(self.nodes)-1):
+                self.gpr6[j] = self.rules.GPR6(j)
+            self.gpr6[1:-1] = self.min_max(self.gpr6[1:-1])
+        return self.gpr6[i]
 
-    def __set_boundary(self,nodes,level,start,end):
-        if start+1 >= end-1 :
-            return 
-
-        gpr5 = np.array([0.0] * (end-start))
-        bond_number = []
-        for i in range(start+1,end-1):
-            if nodes[i].rule.low_boundary == 1 and nodes[i].rule.boundary == 0:
-                bond_number.append(i)
-
-        if len(bond_number) == 0:
-            return
-        
-        B_high = np.array([0.0] * len(nodes))
-        for i in range(end-start):
-            gpr5[i] = self.rules.GPR5(i+start,start,end)
-        gpr5 = self.min_max(gpr5)
-
-        B_high_list = ["2a","2b","3c","3b","3c","3d","4","5","6"]
-        for i in bond_number:
-            nodes[i].rule.GPR["4"] = self.rules.GPR4(i,start,end)
-            nodes[i].rule.GPR["5"] = gpr5[i-start]
-            for k in B_high_list:
-                B_high[i] += nodes[i].rule.GPR[k]*self.param["S"+k]
-
-        B_high[bond_number] = self.min_max(B_high[bond_number])
-        for i in bond_number:
-            nodes[i].rule.high_boundary = nodes[i].rule.low_boundary * B_high[i]
-
-        high_boundary = bond_number[0]
-        for num in bond_number:
-            if nodes[num].rule.high_boundary > nodes[high_boundary].rule.high_boundary:
-                high_boundary = num
-
-        nodes[high_boundary].rule.boundary = level
-
-        self.__set_boundary(nodes,level+1,start,high_boundary+1)
-        self.__set_boundary(nodes,level+1,high_boundary,end)
+    def recursion_process(self, nodes):
+        self.__set_boundary(nodes,1,0,len(nodes))
 
     def get_result(self):
         return self.nodes
@@ -438,7 +438,7 @@ class GPR(GTTMRuleSet):
         divide_num = 0
         group = et.SubElement(root,'group')
         for i in range(len(nodes)):
-            if nodes[i].rule.boundary == n:
+            if nodes[i].boundary == n:
                 divide_flag = 1
                 divide_num = i
             
@@ -451,14 +451,14 @@ class GPR(GTTMRuleSet):
                 if nodes[i] != None:
                     if nodes[i+1] != None:
                         note = et.SubElement(group,'note')
-                        note.set('id',nodes[i].rule.id)
+                        note.set('id',nodes[i].id)
                         if i+1 != len(nodes)-1:
                             self.__write_rule(nodes[i+1],group)
 
     def __write_rule(self,node,group):
         rules_list = ["2a","2b","3c","3b","3c","3d","4","5","6"]
         for k in rules_list:
-            if node.rule.GPR[k] == 1:
+            if node.rule[k] == 1:
                 applied = et.SubElement(group,'applied')
                 applied.set('rule',k)
 

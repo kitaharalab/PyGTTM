@@ -16,14 +16,14 @@ class TS_node:
         self.pitch = pitch #次のヘッドとの音高差
         self.dot = dot #現在のヘッドの拍点
         self.boundary = boundary #境界のレベル
-        self.rule = TS_rule()
-        self.rule.id = id
+        self.id = id
         self.primary = None
         self.secondary = None
         self.left = None
         self.right = None
         self.prebrunch = None
         self.d = 0
+        self.rule = {"1":0, "3":0, "4":0, "8":0, "9":0 }
 
 class TS_rule:
 
@@ -103,8 +103,8 @@ class TS(GTTMRuleSet):
         id = ""
         boundary_level = 0
         for node in GPR:
-            if boundary_level < node.rule.boundary:
-                boundary_level = node.rule.boundary
+            if boundary_level < node.boundary:
+                boundary_level = node.boundary
         boundary_level += 1
         for i in range(self.score.get_score_length()):
             L_end = self.score.get_L_end(i)
@@ -117,12 +117,12 @@ class TS(GTTMRuleSet):
                 ioi = 0
             while MPR[k].L_end < L_end:
                 k += 1
-            dot = MPR[k].rule.dot
+            dot = MPR[k].dot
             pitch = self.score.get_num(i)
             
-            if GPR[i].rule.boundary != 0:
+            if GPR[i].boundary != 0:
                 if i != 0:
-                    boundary = boundary_level - GPR[i].rule.boundary
+                    boundary = boundary_level - GPR[i].boundary
             else :
                 boundary = 0
             id = self.score.get_id(i)
@@ -131,17 +131,14 @@ class TS(GTTMRuleSet):
         T_nodes[0].boundary = boundary_level
         return T_nodes
 
-    def apply_rules(self):
-        self.__calc_TS(self.nodes)
+    def get_param(self):
+        return self.param
 
-    def __calc_TS(self,nodes):
+    def create_rule(self,nodes,param):
         rest = []
         ioi = []
         pitch = []
         dot = []
-        if self.__only_group(nodes) == 1:
-            for n in nodes:
-                n.boundary -= 1
 
         for n in nodes:
             rest.append(n.rest)
@@ -150,33 +147,35 @@ class TS(GTTMRuleSet):
             dot.append(n.dot)
 
         self.rules = Rules(nodes,rest,ioi,pitch,dot)
-        rules = self.rules
-
-        B_i = np.array([0.0] * len(nodes))
-
-        apply_rule = {"1":rules.TS1,"3":rules.TS3,"8":rules.TS8,"9":rules.TS9}
-
-        for i in range(len(nodes)):
-            for key,rule_func in apply_rule.items():
-                nodes[i].rule.TS[key] = rule_func(i)
-                B_i[i] += nodes[i].rule.TS[key] * self.param["S"+key]
+        return self.rules
         
-        D_i = np.array([0.0] * len(nodes))
-        for i in range(len(nodes)):
-            sum = 0
-            for k in range(len(nodes)):
-                if rules.TS4(i,k) == 1:
-                    sum += B_i[i]*self.param["S4"]
-            D_i[i] = B_i[i] + sum
+    def rule_set(self,rules):
+        apply_rule = {"1":rules.TS1,"3":rules.TS3,"8":rules.TS8,"9":rules.TS9}
+        return apply_rule
 
+    def apply_recursive_process(self, D_sum):
+        D_i = np.array([0.0] * len(D_sum))
+        for i in range(len(D_sum)):
+            sum = 0
+            for k in range(len(D_sum)):
+                if self.rules.TS4(i,k) == 1:
+                    sum += D_sum[i]*self.param["S4"]
+            D_i[i] = D_sum[i] + sum
+        return D_i
+
+    def calc_analysis(self, nodes, D_sum):
+        
         next_brunch = []
         i_end = 0
         i = 0
         tmp_node = None
-        D_i = self.__min_max(D_i)
+        D_sum = self.__min_max(D_sum)
+        if self.__only_group(nodes) == 1:
+            for n in nodes:
+                n.boundary -= 1
         #print()
         #for n in nodes:
-        #    print(n.head_L_end,n.rule.id,n.boundary)
+        #    print(n.head_L_end,n.id,n.boundary)
         while i < len(nodes):
             if i_end == i:
                 if tmp_node != None:
@@ -186,7 +185,7 @@ class TS(GTTMRuleSet):
 
             #print(i,i_end)
             """
-            if D_i[i] > 0.7:
+            if D_sum[i] > 0.7:
                 if tmp_node != None:
                     next_brunch.append(tmp_node)
                 tmp_node = nodes[i]
@@ -196,15 +195,15 @@ class TS(GTTMRuleSet):
             
             if i+1 >= i_end :
                 if tmp_node != None:
-                    if D_i[i-1] >= D_i[i]:
+                    if D_sum[i-1] >= D_sum[i]:
                         brunch = TS_node(nodes[i-1].head_L_end,nodes[i-1].head_R_end,nodes[i-1].rest,
-                                nodes[i-1].ioi,nodes[i-1].pitch,nodes[i-1].dot,nodes[i-1].boundary,nodes[i-1].rule.id)
+                                nodes[i-1].ioi,nodes[i-1].pitch,nodes[i-1].dot,nodes[i-1].boundary,nodes[i-1].id)
                         brunch.primary = nodes[i-1]
                         brunch.secondary = nodes[i]
                         
                     else:
                         brunch = TS_node(nodes[i].head_L_end,nodes[i].head_R_end,nodes[i].rest,
-                                nodes[i].ioi,nodes[i].pitch,nodes[i].dot,nodes[i].boundary,nodes[i].rule.id)
+                                nodes[i].ioi,nodes[i].pitch,nodes[i].dot,nodes[i].boundary,nodes[i].id)
                         brunch.primary = nodes[i]
                         brunch.secondary = nodes[i-1]
                         if nodes[i-1].boundary != 0:
@@ -219,7 +218,7 @@ class TS(GTTMRuleSet):
                         brunch.R_end = brunch.primary.R_end
                     brunch.ts_len = brunch.R_end-brunch.L_end
                     
-                    #print(D_i[i], D_i[i+1])
+                    #print(D_sum[i], D_sum[i+1])
                     #print(brunch.primary.head_L_end,brunch.secondary.head_L_end)
                     next_brunch.append(brunch)
                     tmp_node = None
@@ -228,16 +227,16 @@ class TS(GTTMRuleSet):
                     next_brunch.append(nodes[i])
                     i += 1
             else:
-                if tmp_node != None and (i+1 >= i_end or D_i[i-1] > D_i[i+1]):
-                    if D_i[i-1] >= D_i[i]:
+                if tmp_node != None and (i+1 >= i_end or D_sum[i-1] > D_sum[i+1]):
+                    if D_sum[i-1] >= D_sum[i]:
                         brunch = TS_node(nodes[i-1].head_L_end,nodes[i-1].head_R_end,nodes[i-1].rest,
-                                nodes[i-1].ioi,nodes[i-1].pitch,nodes[i-1].dot,nodes[i-1].boundary,nodes[i-1].rule.id)
+                                nodes[i-1].ioi,nodes[i-1].pitch,nodes[i-1].dot,nodes[i-1].boundary,nodes[i-1].id)
                         brunch.primary = nodes[i-1]
                         brunch.secondary = nodes[i]
                         
                     else:
                         brunch = TS_node(nodes[i].head_L_end,nodes[i].head_R_end,nodes[i].rest,
-                                nodes[i].ioi,nodes[i].pitch,nodes[i].dot,nodes[i].boundary,nodes[i].rule.id)
+                                nodes[i].ioi,nodes[i].pitch,nodes[i].dot,nodes[i].boundary,nodes[i].id)
                         brunch.primary = nodes[i]
                         brunch.secondary = nodes[i-1]
                         if nodes[i-1].boundary != 0:
@@ -245,15 +244,15 @@ class TS(GTTMRuleSet):
                     i += 1
                 
                 else:
-                    if D_i[i] >= D_i[i+1]:
+                    if D_sum[i] >= D_sum[i+1]:
                         brunch = TS_node(nodes[i].head_L_end,nodes[i].head_R_end,nodes[i].rest,
-                                nodes[i].ioi,nodes[i].pitch,nodes[i].dot,nodes[i].boundary,nodes[i].rule.id)
+                                nodes[i].ioi,nodes[i].pitch,nodes[i].dot,nodes[i].boundary,nodes[i].id)
                         brunch.primary = nodes[i]
                         brunch.secondary = nodes[i+1]
                         
                     else:
                         brunch = TS_node(nodes[i+1].head_L_end,nodes[i+1].head_R_end,nodes[i+1].rest,
-                                nodes[i+1].ioi,nodes[i+1].pitch,nodes[i+1].dot,nodes[i+1].boundary,nodes[i+1].rule.id)
+                                nodes[i+1].ioi,nodes[i+1].pitch,nodes[i+1].dot,nodes[i+1].boundary,nodes[i+1].id)
                         brunch.primary = nodes[i+1]
                         brunch.secondary = nodes[i]
                         if nodes[i].boundary != 0:
@@ -279,11 +278,15 @@ class TS(GTTMRuleSet):
         if tmp_node != None:
             next_brunch.append(tmp_node)
             tmp_node = None
-       
-        if len(next_brunch) > 1:
-            self.__calc_TS(next_brunch)
+
+        return next_brunch
+
+    def recursion_process(self, nodes):
+        if len(nodes) > 1:
+            super().recursion_process(nodes)
         else :
-            self.root = next_brunch[0]
+            self.root = nodes[0]
+
 
     def __only_group(self, nodes):
         if nodes == None:
@@ -341,7 +344,7 @@ class TS(GTTMRuleSet):
         chord.set('duration', str(node.head_R_end - node.head_L_end))
         chord.set('velocity', str(90))
         note = et.SubElement(chord, 'note')
-        note.set('id',node.rule.id)
+        note.set('id',node.id)
 
         if node.primary != None:
             primary = et.SubElement(ts,'primary')

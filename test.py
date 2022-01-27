@@ -5,7 +5,7 @@ from TS import TS
 import sys
 
 def main():
-    filename = sys.argv[0]
+    filename = sys.argv[1]
 
     score = Score(filename)
 
