@@ -264,22 +264,18 @@ class MPR(GTTMRuleSet):
     def get_result(self):
         return self.nodes
 
-    def write_file(self,filename):
+    def set_element(self):
         root = et.Element('MPR')
         part = et.SubElement(root,'part')
         part.set('id','P1')
-        
+        return root, part
+
+    def construct_xml(self, element):
         for n in self.nodes:
-            metric = et.SubElement(part,'metric')
+            metric = et.SubElement(element,'metric')
             metric.set('dot',str(n.rule.dot))
             metric.set('at',str(n.L_end))
             if n.rule.id != "":
                 note = et.SubElement(metric,'note')
                 note.set('id', n.rule.id)
-
-
-        document = md.parseString(et.tostring(root,'utf-8'))
-        file = open(filename,'w')
-        document.writexml(file, encoding='utf-8', newl='\n', indent='', addindent='  ')
-        file.close()
 

@@ -18,7 +18,7 @@ class GPR_node:
         self.low_boundary = 0
         self.high_boundary = 0
         self.rule = {"1":0, "2a":0, "2b":0, "3a":0, "3b":0, "3c":0, "3d":0, "4":0, "5":0, "6":0}
-        self.id = ""
+        self.id = id
 
 
 class Rules:
@@ -420,18 +420,16 @@ class GPR(GTTMRuleSet):
     def get_result(self):
         return self.nodes
 
-    def write_file(self,filename):
+
+    def set_element(self):
         root = et.Element('GPR')
         part = et.SubElement(root,'part')
         part.set('id','P1')
         group = et.SubElement(part,'group')
-        self.__write_gpr(group,self.nodes,1)
+        return root,group
 
-        document = md.parseString(et.tostring(root,'utf-8'))
-
-        file = open(filename,'w')
-        document.writexml(file, encoding='utf-8', newl='\n', indent='', addindent='  ')
-        file.close()
+    def construct_xml(self, element):
+        self.__write_gpr(element,self.nodes,1)
 
     def __write_gpr(self,root,nodes,n):
         divide_flag = 0

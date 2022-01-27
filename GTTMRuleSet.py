@@ -1,4 +1,6 @@
 from abc import ABCMeta, abstractmethod
+import xml.etree.ElementTree as et
+import xml.dom.minidom as md
 import numpy as np
 
 class GTTMRuleSet(metaclass=ABCMeta):
@@ -59,6 +61,20 @@ class GTTMRuleSet(metaclass=ABCMeta):
     def get_result(self):
         return self.get_nodes()
 
-    @abstractmethod
     def write_file(self, filename):
+        root,element = self.set_element()
+
+        self.construct_xml(element)
+
+        document = md.parseString(et.tostring(root,'utf-8'))
+        file = open(filename,'w')
+        document.writexml(file, encoding='utf-8', newl='\n', indent='', addindent='  ')
+        file.close()
+
+    @abstractmethod
+    def set_element(self):
+        pass
+
+    @abstractmethod
+    def construct_xml(self,element):
         pass

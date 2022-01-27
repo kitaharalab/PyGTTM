@@ -25,11 +25,6 @@ class TS_node:
         self.d = 0
         self.rule = {"1":0, "3":0, "4":0, "8":0, "9":0 }
 
-class TS_rule:
-
-    def __init__(self):
-        self.TS = {"1":0, "3":0, "4":0, "8":0, "9":0 }
-        self.id = ""
 
 class Rules:
     def __init__(self,nodes,rest,ioi,pitch,dot):
@@ -322,15 +317,12 @@ class TS(GTTMRuleSet):
     def get_result(self):
         return self.root
 
-    def write_file(self,filename):
+    def set_element(self):
         root = et.Element('tstree')
+        return root,root
 
-        self.__write_ts(root,self.root)
-
-        document = md.parseString(et.tostring(root,'utf-8'))
-        file = open(filename,'w')
-        document.writexml(file, encoding='utf-8', newl='\n', indent='', addindent='  ')
-        file.close()
+    def construct_xml(self, element):
+        self.__write_ts(element,self.root)
 
     def __write_ts(self,root,node):
         if node == None:
