@@ -12,14 +12,17 @@ def main():
     gpr = GPR(score)
     gpr.apply_rules()
     G_nodes = gpr.get_result()
+    gpr.write_file(filename+"_gpr.xml")
 
     mpr = MPR(score,G_nodes)
     mpr.apply_rules()
     M_nodes = mpr.get_result()
+    mpr.write_file(filename+"_mpr.xml")
 
     ts = TS(score,G_nodes,M_nodes)
     ts.apply_rules()
     T_nodes = ts.get_result()
+    ts.write_file(filename+"_ts.xml")
 
     print_TS(T_nodes,0)
 

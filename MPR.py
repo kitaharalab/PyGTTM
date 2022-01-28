@@ -273,9 +273,9 @@ class MPR(GTTMRuleSet):
     def construct_xml(self, element):
         for n in self.nodes:
             metric = et.SubElement(element,'metric')
-            metric.set('dot',str(n.rule.dot))
+            metric.set('dot',str(n.dot))
             metric.set('at',str(n.L_end))
-            if n.rule.id != "":
+            if n.id != "":
                 note = et.SubElement(metric,'note')
-                note.set('id', n.rule.id)
+                note.set('id', n.id)
 
